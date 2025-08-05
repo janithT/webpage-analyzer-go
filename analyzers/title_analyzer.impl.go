@@ -9,15 +9,15 @@ import (
 
 const titleHtmlTag = "title"
 
-type TitleAnalyzer struct{}
+type titleAnalyzer struct{}
 
 // Construct function to title analyzer
-// func NewTitleAnalyzer() Analyzer {
-// 	return &titleAnalyzer{}
-// }
+func TitleAnalyzer() Analyzer {
+	return &titleAnalyzer{}
+}
 
 // Logic here
-func (a TitleAnalyzer) Analyze(doc *goquery.Document, _ string) Result {
+func (a titleAnalyzer) Analyze(doc *goquery.Document, _ string) Result {
 
 	startTime := time.Now()
 	log.Println("Title analyzer started")

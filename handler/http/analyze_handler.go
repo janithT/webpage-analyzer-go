@@ -38,11 +38,11 @@ func AnalyzeHandler(ginC *gin.Context) {
 	// Initializing the page analyzers.
 	// Then pass to the pool for analyze each.
 	analyzersList := []analyzers.Analyzer{
-		analyzers.HTMLVersionAnalyzer{},
-		analyzers.TitleAnalyzer{},
-		analyzers.HeadingAnalyzer{},
-		analyzers.LoginFormAnalyzer{},
-		analyzers.LinkAnalyzer{},
+		analyzers.HTMLVersionAnalyzer(),
+		analyzers.TitleAnalyzer(),
+		analyzers.HeadingAnalyzer(),
+		analyzers.LoginFormAnalyzer(),
+		analyzers.LinkAnalyzer(),
 	}
 
 	// Add pool to execute
