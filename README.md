@@ -29,7 +29,7 @@ This tool is designed for simplicity and performance:
 - Clicking **Run Analyzer** initiates an analysis of the target web page.
 - The analysis runs in a **multi-threaded** manner for fast response times and scalable performance.
 
-![Web Page Analyzer Architecture]([![go-analyzer.png](https://i.postimg.cc/jSW9qhhY/go-analyzer.png)](https://postimg.cc/zyrp0KMx))
+[![go-analyzer.png](https://i.postimg.cc/jSW9qhhY/go-analyzer.png)](https://postimg.cc/zyrp0KMx)
 
 ---
 
@@ -54,7 +54,7 @@ You can run the project in two different ways:
 ## Sample UI/UX 
 - If you ran the project successfully
 
-![Initial view][![web1.png](https://i.postimg.cc/ZYXJhj3p/web1.png)](https://postimg.cc/QVg2QQfd)
+[![Initial view](https://i.postimg.cc/ZYXJhj3p/web1.png)](https://postimg.cc/QVg2QQfd)
 
 [![example.com](https://i.postimg.cc/3JpYrpC6/web2.png)](https://postimg.cc/pp2gqmSY)
 
