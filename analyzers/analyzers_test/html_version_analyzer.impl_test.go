@@ -33,7 +33,7 @@ func TestHTMLVersionAnalyzer(t *testing.T) {
 		},
 	}
 
-	analyzer := analyzers.HTMLVersionAnalyzer{}
+	analyzer := analyzers.HTMLVersionAnalyzer()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -8,7 +8,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type HTMLVersionAnalyzer struct{}
+type hTMLVersionAnalyzer struct{}
+
+// Construct function to title analyzer
+func HTMLVersionAnalyzer() Analyzer {
+	return &hTMLVersionAnalyzer{}
+}
 
 const defaultVersion string = "Unknown"
 
@@ -24,7 +29,7 @@ var htmlDoctypes = map[string]string{
 	"-//W3C//DTD XHTML 1.1//EN":              "XHTML 1.1",
 }
 
-func (a HTMLVersionAnalyzer) Analyze(_ *goquery.Document, raw string) Result {
+func (a hTMLVersionAnalyzer) Analyze(_ *goquery.Document, raw string) Result {
 
 	startTime := time.Now()
 	log.Println("Html version analyzer started")

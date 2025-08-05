@@ -15,9 +15,13 @@ const (
 	passwordAttribute = "password"
 )
 
-type LoginFormAnalyzer struct{}
+type loginFormAnalyzer struct{}
 
-func (a LoginFormAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
+func LoginFormAnalyzer() Analyzer {
+	return &loginFormAnalyzer{}
+}
+
+func (a loginFormAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 
 	startTime := time.Now()
 	log.Println("Login exists analyzer started")

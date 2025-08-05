@@ -42,10 +42,14 @@ type LinkProperty struct {
 }
 
 // LinkAnalyzer is the analyzer struct
-type LinkAnalyzer struct{}
+type linkAnalyzer struct{}
+
+func LinkAnalyzer() Analyzer {
+	return &linkAnalyzer{}
+}
 
 // Analyze performs full analysis of the document and HTML
-func (a LinkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
+func (a linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 	startTime := time.Now()
 	log.Println("Link analyzer started")
 
@@ -114,7 +118,7 @@ func (a LinkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 }
 
 // processToken handles individual tag attributes and normalizes URL
-func (a LinkAnalyzer) processToken(links *sync.Map, token html.Token, attrName, baseDomain string) {
+func (a linkAnalyzer) processToken(links *sync.Map, token html.Token, attrName, baseDomain string) {
 	attrVal := getLinkAttr(token, attrName)
 	if attrVal == "" {
 		return
