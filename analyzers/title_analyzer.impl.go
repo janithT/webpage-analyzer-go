@@ -11,6 +11,12 @@ const titleHtmlTag = "title"
 
 type TitleAnalyzer struct{}
 
+// Construct function to title analyzer
+// func NewTitleAnalyzer() Analyzer {
+// 	return &titleAnalyzer{}
+// }
+
+// Logic here
 func (a TitleAnalyzer) Analyze(doc *goquery.Document, _ string) Result {
 
 	startTime := time.Now()
