@@ -48,6 +48,7 @@ func (a loginFormAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result
 	}
 }
 
+// callback function to get attribute value
 func getAttr(token html.Token, attrName string) string {
 	for _, attr := range token.Attr {
 		if strings.EqualFold(attr.Key, attrName) {
