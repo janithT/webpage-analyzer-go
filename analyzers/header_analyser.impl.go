@@ -8,13 +8,13 @@ import (
 	"github.com/janithT/webpage-analyzer/handler/models"
 )
 
-type HeadingAnalyzer struct{}
+type headingAnalyzer struct{}
 
-func NewHeadingAnalyzer() Analyzer {
-	return &HeadingAnalyzer{}
+func HeadingAnalyzer() Analyzer {
+	return &headingAnalyzer{}
 }
 
-func (a HeadingAnalyzer) Analyze(doc *goquery.Document, _ string) Result {
+func (a headingAnalyzer) Analyze(doc *goquery.Document, _ string) Result {
 
 	startTime := time.Now()
 	log.Println("Heading analyzer started")

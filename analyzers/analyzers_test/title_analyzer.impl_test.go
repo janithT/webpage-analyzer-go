@@ -11,7 +11,7 @@ import (
 
 func TestTitleAnalyzer_Simple(t *testing.T) {
 	fmt.Println("dsdsdsdsds1")
-	analyzer := analyzers.TitleAnalyzer{}
+	analyzer := analyzers.TitleAnalyzer()
 
 	// Create HTML with a title
 	html := `<html><head><title>Test Title</title></head><body></body></html>`
@@ -32,7 +32,7 @@ func TestTitleAnalyzer_Simple(t *testing.T) {
 }
 
 func TestTitleAnalyzer_EmptyTitle(t *testing.T) {
-	analyzer := analyzers.TitleAnalyzer{}
+	analyzer := analyzers.TitleAnalyzer()
 
 	html := `<html><head><title></title></head><body></body></html>`
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
