@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// test the fetch and parse is valid
 func TestFetchAndParseValid(t *testing.T) {
 
 	//Test on sample html
@@ -30,6 +31,7 @@ func TestFetchAndParseValid(t *testing.T) {
 	}
 }
 
+// test the fetch and parse with bad status
 func TestFetchAndParseBadStatus(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not Found", http.StatusNotFound)

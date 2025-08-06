@@ -9,14 +9,20 @@ import (
 	"os/signal"
 	"time"
 
+	channels "github.com/janithT/webpage-analyzer/channel"
 	"github.com/janithT/webpage-analyzer/config"
 	"github.com/janithT/webpage-analyzer/engine"
 )
 
 func main() {
+	// Get the app configuration from app.yaml
 	conf := config.GetAppConfig()
 
-	router := engine.NewRouter() // Gin router - start here
+	// Start thread pool with 10 workers = 10 set to app.yaml
+	channels.InitializetPageUrlWorkerThreadPool(conf.ThreadCount)
+
+	// Gin router and server
+	router := engine.NewRouter()
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%v", conf.ServicePort),
@@ -26,7 +32,6 @@ func main() {
 		IdleTimeout:  15 * time.Second,
 	}
 
-	// Run the server in a goroutine so it doesn't block.
 	go func() {
 		log.Printf("Server is running on port %v. Visit: http://localhost:%v/", conf.ServicePort, conf.ServicePort)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -34,14 +39,14 @@ func main() {
 		}
 	}()
 
-	// Shutdown setup
+	// Shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, os.Kill)
 	<-quit
 
 	log.Println("Shutting down server...")
 
-	// Context with timeout for shutdown
+	// Timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
