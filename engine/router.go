@@ -22,11 +22,10 @@ func NewRouter() *gin.Engine {
 	// Serve Angular dist output
 	// router.Static("/", "./web/wep-page-analyzer-ng")
 
-	// API route
+	// API route - use api prefix later
 	router.GET("/v1/analyze", httpHandler.AnalyzeHandler)
 
-	// SPA fallback for Angular
-
+	// fallback angular
 	router.NoRoute(func(c *gin.Context) {
 		dir, file := path.Split(c.Request.RequestURI)
 		ext := filepath.Ext(file)

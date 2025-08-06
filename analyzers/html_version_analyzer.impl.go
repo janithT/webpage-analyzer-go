@@ -17,7 +17,7 @@ func HTMLVersionAnalyzer() Analyzer {
 
 const defaultVersion string = "Unknown"
 
-// htmlDoctypes maps known DOCTYPE identifiers to HTML version names.
+// htmlDoctypes maps known DOCTYPE HTML version names.
 var htmlDoctypes = map[string]string{
 	"<!DOCTYPE html>":                        "HTML5",
 	"-//W3C//DTD HTML 4.01//EN":              "HTML 4.01 Strict",
