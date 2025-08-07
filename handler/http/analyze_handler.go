@@ -31,6 +31,21 @@ func AnalyzeHandler(ginC *gin.Context) {
 	// For fetch errors when fetching and parsing.
 	doc, raw, status, err := fetcher.FetchAndParse(url)
 	if err != nil {
+		// Handle 403 Forbidden
+		if status == http.StatusForbidden {
+			responses.WriteError(ginC, http.StatusForbidden, "This URL is not accessible. Please check if the site is blocking requests.")
+			return
+		}
+
+		// Handle DNS/host not found
+		if strings.Contains(strings.ToLower(err.Error()), "No such host, Please enter correct URL") ||
+			strings.Contains(strings.ToLower(err.Error()), "Server is misbehaving") ||
+			strings.Contains(strings.ToLower(err.Error()), "lookup") {
+			responses.WriteError(ginC, http.StatusBadRequest, "The specified host could not be found. Please check the domain name.")
+			return
+		}
+
+		// Generic error
 		responses.WriteError(ginC, status, err.Error())
 		return
 	}
