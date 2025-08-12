@@ -43,7 +43,7 @@ type linkAnalyzer struct {
 	mu    sync.Mutex
 }
 
-// NewLinkAnalyzer creates a new linkAnalyzer instance
+// new linkAnalyzer instance
 func LinkAnalyzer() Analyzer {
 	return &linkAnalyzer{}
 }
@@ -66,7 +66,7 @@ func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 	// Temporary map to deduplicate URLs
 	linkMap := make(map[string]LinkProperty)
 
-	// Find all tags with URLs (a[href], link[href], script[src], img[src])
+	// Find all tags with URLs
 	doc.Find("a[href], link[href], script[src], img[src]").Each(func(i int, s *goquery.Selection) {
 		var attr string
 		if s.Is("a, link") {
