@@ -53,7 +53,8 @@ func (lt LinkType) MarshalJSON() ([]byte, error) {
 var wg sync.WaitGroup
 
 type linkAnalyzer struct {
-	links   sync.Map
+	links   []LinkProperty
+	mu      sync.Mutex
 	urlExec channels.UrlWorker
 }
 
@@ -71,32 +72,32 @@ func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 		log.Printf("Link analyzer completed. Duration: %v ms", time.Since(start).Milliseconds())
 	}(startTime)
 
-	l.links = sync.Map{}
+	l.links = []LinkProperty{}
 
 	// Extract links
 	l.prepare(doc, rawHTML)
 
 	// Prepare workers
-	wg.Add(l.getMapLength())
+	wg := sync.WaitGroup{}
+	wg.Add(len(l.links))
 
 	// Push each link to channel
-	l.links.Range(func(key, _ interface{}) bool {
+	for i := range l.links {
+		idx := i
+		url := l.links[idx].Url
 		l.urlExec.Create().
 			Build(
-				key.(string),
+				url,
 				&wg,
-				func(url string, status int, latency int64) {
-					if val, ok := l.links.Load(url); ok {
-						lp := val.(LinkProperty)
-						lp.StatusCode = status
-						lp.Latency = latency
-						l.links.Store(url, lp)
-					}
+				func(_ string, status int, latency int64) {
+					l.mu.Lock()
+					l.links[idx].StatusCode = status
+					l.links[idx].Latency = latency
+					l.mu.Unlock()
 				},
 			).
 			PushChannel()
-		return true
-	})
+	}
 
 	// Wait for all
 	wg.Wait()
@@ -107,10 +108,7 @@ func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 	externalCount := 0
 	unknownCount := 0
 
-	l.links.Range(func(_, value interface{}) bool {
-		lp := value.(LinkProperty)
-		results = append(results, lp)
-
+	for _, lp := range l.links {
 		switch lp.Type {
 		case Internal:
 			internalCount++
@@ -119,10 +117,9 @@ func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 		default:
 			unknownCount++
 		}
-		return true
-	})
+	}
 
-	totalCount := internalCount + externalCount + unknownCount
+	totalCount := len(l.links)
 
 	return Result{
 		Key: "urls",
@@ -179,21 +176,21 @@ func (l *linkAnalyzer) prepare(doc *goquery.Document, rawHTML string) {
 // if valied store the link
 func (l *linkAnalyzer) storeIfValid(url, baseDomain string) {
 	if isValidLink(url) {
-		l.links.Store(url, LinkProperty{
+		lp := LinkProperty{
 			Url:  url,
 			Type: getLinkType(url, baseDomain),
-		})
+		}
+		l.mu.Lock()
+		l.links = append(l.links, lp)
+		l.mu.Unlock()
 	}
 }
 
-// number of links in the map
+// number of links in the slice
 func (l *linkAnalyzer) getMapLength() int {
-	count := 0
-	l.links.Range(func(_, _ interface{}) bool {
-		count++
-		return true
-	})
-	return count
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.links)
 }
 
 // get link type > with base domain
@@ -207,7 +204,13 @@ func getLinkType(link, baseDomain string) LinkType {
 // check if the link is valid
 func isValidLink(link string) bool {
 	trimmed := strings.TrimSpace(link)
-	return strings.HasPrefix(trimmed, httpPref)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return false // skip empty and fragment-only links
+	}
+	if strings.HasPrefix(trimmed, "http") || strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "//") {
+		return true
+	}
+	return false
 }
 
 // get tag attribute value
