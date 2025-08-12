@@ -2,14 +2,12 @@ package analyzers
 
 import (
 	"log"
-	"strings"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	channels "github.com/janithT/webpage-analyzer/channel"
-	"golang.org/x/net/html"
-	"golang.org/x/net/publicsuffix"
 )
 
 // LinkType indicates internal or external
@@ -21,95 +19,137 @@ const (
 	Unknown
 )
 
-const (
-	aTag      = "a"
-	hrefAttr  = "href"
-	httpPref  = "http"
-	scriptTag = "script"
-	srcAttr   = "src"
-	linkTag   = "link"
-)
-
-type LinkProperty struct {
-	Url        string   `json:"url"`
-	Type       LinkType `json:"type"`
-	StatusCode int      `json:"status_code"`
-	Latency    int64    `json:"latency"`
-}
-
+// MarshalJSON for pretty printing LinkType
 func (lt LinkType) MarshalJSON() ([]byte, error) {
 	switch lt {
 	case Internal:
 		return []byte(`"Internal"`), nil
 	case External:
 		return []byte(`"External"`), nil
-	case Unknown:
-		return []byte(`"Unknown"`), nil
 	default:
 		return []byte(`"Unknown"`), nil
 	}
 }
 
-var wg sync.WaitGroup
+type LinkProperty struct {
+	Url        string   `json:"url"`
+	Type       LinkType `json:"type"`
+	StatusCode int      `json:"status_code"`
+	Latency    int64    `json:"latency"` // milliseconds
+}
 
 type linkAnalyzer struct {
-	links   []LinkProperty
-	mu      sync.Mutex
-	urlExec channels.UrlWorker
+	links []LinkProperty
+	mu    sync.Mutex
 }
 
+// NewLinkAnalyzer creates a new linkAnalyzer instance
 func LinkAnalyzer() Analyzer {
-	return &linkAnalyzer{
-		urlExec: channels.NewUrlWorker(),
-	}
+	return &linkAnalyzer{}
 }
 
+// Analyze extracts all URLs and fetches their status asynchronously
 func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 	startTime := time.Now()
-
 	log.Println("Link analyzer started")
 	defer func(start time.Time) {
 		log.Printf("Link analyzer completed. Duration: %v ms", time.Since(start).Milliseconds())
 	}(startTime)
 
-	l.links = []LinkProperty{}
+	l.links = nil
 
-	// Extract links
-	l.prepare(doc, rawHTML)
-
-	// Prepare workers
-	wg := sync.WaitGroup{}
-	wg.Add(len(l.links))
-
-	// Push each link to channel
-	for i := range l.links {
-		idx := i
-		url := l.links[idx].Url
-		l.urlExec.Create().
-			Build(
-				url,
-				&wg,
-				func(_ string, status int, latency int64) {
-					l.mu.Lock()
-					l.links[idx].StatusCode = status
-					l.links[idx].Latency = latency
-					l.mu.Unlock()
-				},
-			).
-			PushChannel()
+	baseDomain := ""
+	if doc.Url != nil && doc.Url.Host != "" {
+		baseDomain = doc.Url.Hostname()
 	}
 
-	// Wait for all
+	// Temporary map to deduplicate URLs
+	linkMap := make(map[string]LinkProperty)
+
+	// Find all tags with URLs (a[href], link[href], script[src], img[src])
+	doc.Find("a[href], link[href], script[src], img[src]").Each(func(i int, s *goquery.Selection) {
+		var attr string
+		if s.Is("a, link") {
+			attr, _ = s.Attr("href")
+		} else { // script, img
+			attr, _ = s.Attr("src")
+		}
+		if attr == "" {
+			return
+		}
+
+		absUrl := resolveUrl(doc.Url, attr)
+		if absUrl == "" {
+			return
+		}
+
+		// Check if URL is valid http or https
+		parsed, err := url.Parse(absUrl)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+			return
+		}
+
+		// Deduplicate
+		if _, exists := linkMap[absUrl]; !exists {
+			linkMap[absUrl] = LinkProperty{
+				Url:  absUrl,
+				Type: getLinkType(absUrl, baseDomain),
+			}
+		}
+	})
+
+	// Convert map to slice
+	for _, lp := range linkMap {
+		l.links = append(l.links, lp)
+	}
+
+	// Use WaitGroup to track async checking of URLs
+	var wg sync.WaitGroup
+	wg.Add(len(l.links))
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	for i := range l.links {
+		go func(idx int) {
+			defer wg.Done()
+			start := time.Now()
+			resp, err := client.Head(l.links[idx].Url)
+			if err != nil || resp == nil {
+				// Possibly try GET if HEAD fails:
+				respGet, errGet := client.Get(l.links[idx].Url)
+				if errGet != nil || respGet == nil {
+					// Mark as unreachable; status code 0
+					l.mu.Lock()
+					l.links[idx].StatusCode = 0
+					l.links[idx].Latency = int64(time.Since(start).Milliseconds())
+					l.mu.Unlock()
+					return
+				}
+				resp = respGet
+				defer resp.Body.Close()
+			} else {
+				defer resp.Body.Close()
+			}
+			latency := int64(time.Since(start).Milliseconds())
+
+			l.mu.Lock()
+			l.links[idx].StatusCode = resp.StatusCode
+			l.links[idx].Latency = latency
+			l.mu.Unlock()
+		}(i)
+	}
+
 	wg.Wait()
 
-	// Collect results & counts
-	var results []LinkProperty
+	// Counts
 	internalCount := 0
 	externalCount := 0
 	unknownCount := 0
 
-	for _, lp := range l.links {
-		switch lp.Type {
+	for _, link := range l.links {
+		switch link.Type {
 		case Internal:
 			internalCount++
 		case External:
@@ -128,97 +168,35 @@ func (l *linkAnalyzer) Analyze(doc *goquery.Document, rawHTML string) Result {
 			"internal_count": internalCount,
 			"external_count": externalCount,
 			"unknown_count":  unknownCount,
-			"links":          results,
+			"links":          l.links,
 		},
 	}
-
-	// // Collect results
-	// var results []LinkProperty
-	// l.links.Range(func(_, value interface{}) bool {
-	// 	results = append(results, value.(LinkProperty))
-	// 	return true
-	// })
-
-	// return Result{
-	// 	Key:   "urls",
-	// 	Value: results,
-	// }
 }
 
-// prepare for link extraction
-func (l *linkAnalyzer) prepare(doc *goquery.Document, rawHTML string) {
-	baseDomain := ""
-	if doc.Url != nil && doc.Url.Host != "" {
-		if domain, err := publicsuffix.EffectiveTLDPlusOne(doc.Url.Host); err == nil {
-			baseDomain = domain
-		}
+// resolveUrl resolves a possibly relative URL href against the base *url.URL
+func resolveUrl(base *url.URL, href string) string {
+	if base == nil {
+		return href
 	}
-
-	tokenizer := html.NewTokenizer(strings.NewReader(rawHTML))
-	for {
-		switch tokenizer.Next() {
-		case html.StartTagToken:
-			token := tokenizer.Token()
-			switch token.Data {
-			case aTag:
-				l.storeIfValid(getTagAttribute(token, hrefAttr), baseDomain)
-			case scriptTag:
-				l.storeIfValid(getTagAttribute(token, srcAttr), baseDomain)
-			case linkTag:
-				l.storeIfValid(getTagAttribute(token, hrefAttr), baseDomain)
-			}
-		case html.ErrorToken:
-			return
-		}
+	u, err := base.Parse(href)
+	if err != nil {
+		return ""
 	}
+	return u.String()
 }
 
-// if valied store the link
-func (l *linkAnalyzer) storeIfValid(url, baseDomain string) {
-	if isValidLink(url) {
-		lp := LinkProperty{
-			Url:  url,
-			Type: getLinkType(url, baseDomain),
-		}
-		l.mu.Lock()
-		l.links = append(l.links, lp)
-		l.mu.Unlock()
+// getLinkType determines if URL is Internal, External or Unknown given baseDomain
+func getLinkType(link string, baseDomain string) LinkType {
+	parsedUrl, err := url.Parse(link)
+	if err != nil || baseDomain == "" {
+		return Unknown
 	}
-}
-
-// number of links in the slice
-func (l *linkAnalyzer) getMapLength() int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	return len(l.links)
-}
-
-// get link type > with base domain
-func getLinkType(link, baseDomain string) LinkType {
-	if baseDomain != "" && strings.Contains(link, baseDomain) {
+	host := parsedUrl.Hostname()
+	if host == "" {
+		return Unknown
+	}
+	if host == baseDomain {
 		return Internal
 	}
 	return External
-}
-
-// check if the link is valid
-func isValidLink(link string) bool {
-	trimmed := strings.TrimSpace(link)
-	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-		return false // skip empty and fragment-only links
-	}
-	if strings.HasPrefix(trimmed, "http") || strings.HasPrefix(trimmed, "/") || strings.HasPrefix(trimmed, "//") {
-		return true
-	}
-	return false
-}
-
-// get tag attribute value
-func getTagAttribute(token html.Token, attrName string) string {
-	for _, attr := range token.Attr {
-		if strings.EqualFold(attr.Key, attrName) {
-			return attr.Val
-		}
-	}
-	return ""
 }
